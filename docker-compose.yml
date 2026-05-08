@@ -78,8 +78,8 @@ services:
     environment:
       NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-graphiti_secret}
       NEO4J_PLUGINS: '["apoc"]'
-      NEO4J_dbms_memory_pagecache_size: 512m
-      NEO4J_dbms_memory_heap_max__size: 512m
+      NEO4J_dbms_memory_pagecache_size: 128m
+      NEO4J_dbms_memory_heap_max__size: 128m
     volumes:
       - neo4j_data:/data
     ports:
@@ -150,8 +150,6 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      qdrant:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
