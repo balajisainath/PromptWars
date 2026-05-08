@@ -1,0 +1,61 @@
+{
+  "title": "AI Pipeline",
+  "uid": "ai-pipeline",
+  "version": 1,
+  "schemaVersion": 38,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "LLM Call Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "sum(rate(llm_calls_total{job=\"backend\"}[5m])) by (model, node)",
+          "legendFormat": "{{model}} - {{node}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "LLM Latency p99 (ms)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "histogram_quantile(0.99, sum(rate(llm_call_duration_seconds_bucket[5m])) by (le, node)) * 1000",
+          "legendFormat": "p99 {{node}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Cache Hit Rate",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "sum(rate(cache_hits_total[5m])) / (sum(rate(cache_hits_total[5m])) + sum(rate(cache_misses_total[5m])))"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 } }
+    },
+    {
+      "id": 4,
+      "title": "Agent Iterations (avg)",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "avg(agent_iteration_count)"
+        }
+      ]
+    }
+  ]
+}

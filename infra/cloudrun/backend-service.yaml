@@ -1,0 +1,38 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: travelai-backend
+  annotations:
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "3"
+        run.googleapis.com/cpu-throttling: "false"
+    spec:
+      containerConcurrency: 80
+      timeoutSeconds: 300
+      containers:
+        - image: gcr.io/PROJECT_ID/travelai-backend:latest
+          ports:
+            - containerPort: 8000
+          resources:
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          env:
+            - name: ENVIRONMENT
+              value: production
+            - name: LOG_LEVEL
+              value: INFO
+            - name: REDIS_URL
+              value: REPLACE_WITH_UPSTASH_REDIS_URL
+            - name: DATABASE_URL
+              value: REPLACE_WITH_NEON_DATABASE_URL
+            - name: QDRANT_URL
+              value: REPLACE_WITH_QDRANT_CLOUD_URL
+          envFrom:
+            - secretRef:
+                name: travelai-secrets

@@ -1,0 +1,102 @@
+name: CD — Deploy to Cloud Run + Vercel
+
+on:
+  push:
+    branches: [main]
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: us-central1
+  BACKEND_IMAGE: gcr.io/${{ secrets.GCP_PROJECT_ID }}/travelai-backend
+  GEO_SERVICE_IMAGE: gcr.io/${{ secrets.GCP_PROJECT_ID }}/travelai-geo-service
+  GRAPHITI_IMAGE: gcr.io/${{ secrets.GCP_PROJECT_ID }}/travelai-graphiti-service
+
+jobs:
+  deploy-backend:
+    name: Deploy Backend to Cloud Run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for GCR
+        run: gcloud auth configure-docker
+
+      - name: Build & push backend image
+        run: |
+          docker build -t ${{ env.BACKEND_IMAGE }}:${{ github.sha }} ./backend
+          docker push ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+          docker tag ${{ env.BACKEND_IMAGE }}:${{ github.sha }} ${{ env.BACKEND_IMAGE }}:latest
+          docker push ${{ env.BACKEND_IMAGE }}:latest
+
+      - name: Deploy backend to Cloud Run
+        run: |
+          gcloud run deploy travelai-backend \
+            --image ${{ env.BACKEND_IMAGE }}:${{ github.sha }} \
+            --region ${{ env.REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --min-instances 1 \
+            --max-instances 3 \
+            --memory 512Mi \
+            --cpu 1 \
+            --port 8000 \
+            --set-secrets "GEMINI_API_KEY=GEMINI_API_KEY:latest,GOOGLE_MAPS_API_KEY=GOOGLE_MAPS_API_KEY:latest,FIREBASE_PROJECT_ID=FIREBASE_PROJECT_ID:latest,FIREBASE_CLIENT_EMAIL=FIREBASE_CLIENT_EMAIL:latest,FIREBASE_PRIVATE_KEY=FIREBASE_PRIVATE_KEY:latest,OPENWEATHER_API_KEY=OPENWEATHER_API_KEY:latest" \
+            --set-env-vars "ENVIRONMENT=production,LOG_LEVEL=INFO"
+
+  deploy-geo-service:
+    name: Deploy Geo-Service to Cloud Run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+      - name: Configure Docker
+        run: gcloud auth configure-docker
+      - name: Build & push geo-service
+        run: |
+          docker build -t ${{ env.GEO_SERVICE_IMAGE }}:${{ github.sha }} ./services/geo-service
+          docker push ${{ env.GEO_SERVICE_IMAGE }}:${{ github.sha }}
+      - name: Deploy geo-service to Cloud Run
+        run: |
+          gcloud run deploy travelai-geo-service \
+            --image ${{ env.GEO_SERVICE_IMAGE }}:${{ github.sha }} \
+            --region ${{ env.REGION }} \
+            --platform managed \
+            --no-allow-unauthenticated \
+            --min-instances 0 \
+            --max-instances 2 \
+            --memory 256Mi \
+            --cpu 1 \
+            --port 8080 \
+            --set-secrets "GOOGLE_MAPS_API_KEY=GOOGLE_MAPS_API_KEY:latest" \
+            --set-env-vars "REDIS_HOST=\$REDIS_HOST,REDIS_PORT=6379"
+
+  deploy-frontend:
+    name: Deploy Frontend to Vercel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+      - name: Deploy to Vercel
+        working-directory: frontend
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: vercel deploy --prod --token=${{ env.VERCEL_TOKEN }}

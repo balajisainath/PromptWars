@@ -1,0 +1,78 @@
+steps:
+  # Build backend
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - build
+      - -t
+      - gcr.io/$PROJECT_ID/travelai-backend:$COMMIT_SHA
+      - -t
+      - gcr.io/$PROJECT_ID/travelai-backend:latest
+      - ./backend
+    id: build-backend
+
+  # Push backend
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - push
+      - --all-tags
+      - gcr.io/$PROJECT_ID/travelai-backend
+    waitFor: [build-backend]
+    id: push-backend
+
+  # Build geo-service
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - build
+      - -t
+      - gcr.io/$PROJECT_ID/travelai-geo-service:$COMMIT_SHA
+      - ./services/geo-service
+    id: build-geo
+
+  # Push geo-service
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - push
+      - gcr.io/$PROJECT_ID/travelai-geo-service:$COMMIT_SHA
+    waitFor: [build-geo]
+    id: push-geo
+
+  # Deploy backend to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - travelai-backend
+      - --image=gcr.io/$PROJECT_ID/travelai-backend:$COMMIT_SHA
+      - --region=us-central1
+      - --platform=managed
+      - --allow-unauthenticated
+      - --min-instances=1
+      - --max-instances=3
+      - --memory=512Mi
+      - --port=8000
+    waitFor: [push-backend]
+
+  # Deploy geo-service to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - travelai-geo-service
+      - --image=gcr.io/$PROJECT_ID/travelai-geo-service:$COMMIT_SHA
+      - --region=us-central1
+      - --platform=managed
+      - --no-allow-unauthenticated
+      - --memory=256Mi
+      - --port=8080
+    waitFor: [push-geo]
+
+images:
+  - gcr.io/$PROJECT_ID/travelai-backend:$COMMIT_SHA
+  - gcr.io/$PROJECT_ID/travelai-backend:latest
+  - gcr.io/$PROJECT_ID/travelai-geo-service:$COMMIT_SHA
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8

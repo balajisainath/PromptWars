@@ -1,0 +1,54 @@
+{
+  "title": "Cache Efficiency",
+  "uid": "cache-efficiency",
+  "version": 1,
+  "schemaVersion": 38,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Redis Hit/Miss Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "rate(cache_hits_total[5m])",
+          "legendFormat": "Hits"
+        },
+        {
+          "datasource": "Prometheus",
+          "expr": "rate(cache_misses_total[5m])",
+          "legendFormat": "Misses"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Redis Memory Usage",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "redis_memory_used_bytes"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes" } }
+    },
+    {
+      "id": 3,
+      "title": "Eviction Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 4, "w": 16, "x": 8, "y": 8 },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "rate(redis_evicted_keys_total[5m])",
+          "legendFormat": "Evictions/s"
+        }
+      ]
+    }
+  ]
+}
